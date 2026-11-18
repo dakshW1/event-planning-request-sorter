@@ -270,9 +270,53 @@ def load_classifier(model_dir: Path = MODEL_DIR):
 
 
 # --- Milestone 4: Build an interface (CLI) to input new requests and show their classification.
-# Hint: Implement the inference pipeline to take new requests and predict their classification, mirroring the prediction step in the drill.
-def milestone_4():  # TODO(milestone 4)
-    raise NotImplementedError("TODO(milestone 4)")
+
+def classify(model, tok, text: str) -> list[tuple[str, float]]:
+    """All request types ranked by probability. The model scores the token after 'Type:'; we keep
+    only the 8 label tokens and softmax over them, so the answer is always a valid type."""
+    import torch
+
+    ids = tok(prompt_for(text), return_tensors="pt")
+    with torch.no_grad():
+        logits = model(**ids).logits[0, -1]
+    label_ids = label_token_ids(tok)
+    probs = torch.softmax(logits[list(label_ids.values())], dim=-1).tolist()
+    return sorted(zip(label_ids, probs), key=lambda kv: -kv[1])
+
+
+def evaluate(model, tok, rows: list[dict]) -> dict:
+    """Accuracy, per-type recall and a confusion count on labelled rows."""
+    confusion: dict[str, dict[str, int]] = {lb: {} for lb in LABELS}
+    correct = 0
+    mistakes = []
+    for r in rows:
+        pred = classify(model, tok, r["text"])[0][0]
+        confusion[r["label"]][pred] = confusion[r["label"]].get(pred, 0) + 1
+        if pred == r["label"]:
+            correct += 1
+        else:
+            mistakes.append({"text": r["text"], "label": r["label"], "predicted": pred})
+    recall = {lb: round(c.get(lb, 0) / max(sum(c.values()), 1), 2) for lb, c in confusion.items()}
+    return {"accuracy": round(correct / len(rows), 3), "n": len(rows), "recall": recall,
+            "confusion": confusion, "mistakes": mistakes}
+
+
+KEYWORDS = {  # a simple keyword baseline, to show what fine-tuning adds
+    "venue_inquiry": ["venue", "hall", "capacity", "available", "space", "room", "parking"],
+    "catering_request": ["menu", "food", "lunch", "dinner", "caterer", "buffet", "vegan", "snacks"],
+    "budget_quote": ["cost", "price", "quote", "quotation", "budget", "discount", "how much"],
+    "date_change": ["move", "reschedule", "postpone", "shift", "instead", "later", "forward"],
+    "guest_list": ["guest", "attendee", "headcount", "rsvp", "list", "people now", "invitee"],
+    "decor_theme": ["theme", "decor", "flower", "colour", "lights", "backdrop", "balloon"],
+    "av_equipment": ["projector", "mic", "sound", "wifi", "screen", "dj", "stream", "speaker"],
+    "cancellation": ["cancel", "call off", "refund", "withdrawn", "drop the event"],
+}
+
+
+def keyword_baseline(text: str) -> str:
+    t = text.lower()
+    scores = {lb: sum(w in t for w in words) for lb, words in KEYWORDS.items()}
+    return max(scores, key=lambda lb: (scores[lb], lb == "venue_inquiry"))
 
 
 # --- Milestone 5: Allow saving classified requests to a file for review.

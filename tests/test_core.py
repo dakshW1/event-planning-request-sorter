@@ -97,9 +97,31 @@ def test_pad_collator_masks_padding(base):
 
 
 # Milestone 4: Build an interface (CLI) to input new requests and show their classification.
-@pytest.mark.skip(reason="remove this line when you start milestone 4")
-def test_milestone_4():
-    raise NotImplementedError("write the test for milestone 4")
+def test_classify_returns_a_valid_distribution(trained):
+    model, tok, _, _ = trained
+    ranked = core.classify(model, tok, "Can you send a quotation for 100 people?")
+    assert {lb for lb, _ in ranked} == set(core.LABELS)
+    assert abs(sum(p for _, p in ranked) - 1) < 1e-5
+    assert ranked == sorted(ranked, key=lambda kv: -kv[1])
+
+
+def test_keyword_baseline_and_evaluate(trained):
+    model, tok, _, _ = trained
+    assert core.keyword_baseline("Please cancel the party") == "cancellation"
+    rows = core.load_csv(core.TEST_CSV)[:8]
+    result = core.evaluate(model, tok, rows)
+    assert result["n"] == 8 and 0 <= result["accuracy"] <= 1
+    assert sum(sum(c.values()) for c in result["confusion"].values()) == 8
+
+
+from app.cli import interactive, main  # noqa: E402
+
+
+def test_cli_types_and_classify(trained, capsys):
+    main(["types"])
+    assert "venue_inquiry" in capsys.readouterr().out
+    main(["classify", "Is there a projector?", "--model-dir", str(trained[3])])
+    assert "->" in capsys.readouterr().out
 
 
 # Milestone 5: Allow saving classified requests to a file for review.
