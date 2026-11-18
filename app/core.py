@@ -320,6 +320,30 @@ def keyword_baseline(text: str) -> str:
 
 
 # --- Milestone 5: Allow saving classified requests to a file for review.
-# Hint: Add functionality to your CLI to save the input request and its predicted classification to a file.
-def milestone_5():  # TODO(milestone 5)
-    raise NotImplementedError("TODO(milestone 5)")
+
+def save_classification(text: str, ranked: list[tuple[str, float]], path: Path = LOG_FILE) -> dict:
+    """Append one classified request as a JSON line (easy to grep, diff and load)."""
+    record = {"time": datetime.now(timezone.utc).isoformat(timespec="seconds"), "request": text,
+              "type": ranked[0][0], "confidence": round(ranked[0][1], 3),
+              "runner_up": ranked[1][0] if len(ranked) > 1 else None}
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+    return record
+
+
+def load_saved(path: Path = LOG_FILE) -> list[dict]:
+    path = Path(path)
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def review(records: list[dict], low_confidence: float = 0.6) -> dict[str, list[dict]]:
+    """Group saved requests by type (a planner's work queues); flag low-confidence ones for a human."""
+    queues: dict[str, list[dict]] = {}
+    for r in records:
+        key = "needs_review" if r["confidence"] < low_confidence else r["type"]
+        queues.setdefault(key, []).append(r)
+    return queues

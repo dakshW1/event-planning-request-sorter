@@ -125,7 +125,28 @@ def test_cli_types_and_classify(trained, capsys):
 
 
 # Milestone 5: Allow saving classified requests to a file for review.
-@pytest.mark.skip(reason="remove this line when you start milestone 5")
-def test_milestone_5():
-    raise NotImplementedError("write the test for milestone 5")
+def test_save_and_review(tmp_path):
+    log = tmp_path / "log.jsonl"
+    core.save_classification("Need a vegan menu", [("catering_request", 0.9), ("budget_quote", 0.1)], log)
+    core.save_classification("Hmm, about the thing", [("guest_list", 0.3), ("decor_theme", 0.2)], log)
+    saved = core.load_saved(log)
+    assert [r["type"] for r in saved] == ["catering_request", "guest_list"]
+    queues = core.review(saved, low_confidence=0.6)
+    assert [r["request"] for r in queues["catering_request"]] == ["Need a vegan menu"]
+    assert [r["request"] for r in queues["needs_review"]] == ["Hmm, about the thing"]
 
+
+def test_interactive_saves_each_request(trained, tmp_path):
+    model, tok, _, _ = trained
+    answers = iter(["Is the hall free?", "Cancel it please", ""])
+    saved = interactive(model, tok, tmp_path / "log.jsonl", inp=lambda _: next(answers), out=lambda *_: None)
+    assert len(saved) == 2 and len(core.load_saved(tmp_path / "log.jsonl")) == 2
+
+
+def test_cli_classify_save_then_review(trained, tmp_path, capsys):
+    log = tmp_path / "log.jsonl"
+    main(["classify", "We need two mics", "Please move it to Monday", "--save", "--log", str(log),
+          "--model-dir", str(trained[3])])
+    main(["review", "--log", str(log), "--min-confidence", "0"])
+    out = capsys.readouterr().out
+    assert "We need two mics" in out and "Please move it to Monday" in out
