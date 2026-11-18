@@ -212,9 +212,61 @@ def encode_example(tok, text: str, label: str, max_length: int = 64) -> dict:
 
 
 # --- Milestone 3: Train the model on the example requests using the Hugging Face Trainer.
-# Hint: Use the Hugging Face Trainer to fine-tune your GPT-2 model on your dataset of event requests.
-def milestone_3():  # TODO(milestone 3)
-    raise NotImplementedError("TODO(milestone 3)")
+
+class PadCollator:
+    """Right-pad a batch; padded label positions are -100 so they are ignored by the loss."""
+
+    def __init__(self, pad_id: int):
+        self.pad_id = pad_id
+
+    def __call__(self, batch: list[dict]) -> dict:
+        import torch
+
+        width = max(len(b["input_ids"]) for b in batch)
+        out = {"input_ids": [], "attention_mask": [], "labels": []}
+        for b in batch:
+            pad = width - len(b["input_ids"])
+            out["input_ids"].append(b["input_ids"] + [self.pad_id] * pad)
+            out["attention_mask"].append(b["attention_mask"] + [0] * pad)
+            out["labels"].append(b["labels"] + [-100] * pad)
+        return {k: torch.tensor(v) for k, v in out.items()}
+
+
+def train(rows: list[dict], base_model: str = "gpt2", out_dir: Path = MODEL_DIR, epochs: float = 4,
+          lr: float = 5e-5, batch_size: int = 16, seed: int = 42, log_steps: int = 10):
+    """Fine-tune with the Hugging Face Trainer, save model + tokenizer, return (model, tok, log_history)."""
+    from transformers import Trainer, TrainingArguments, set_seed
+
+    set_seed(seed)
+    model, tok = load_base(base_model)
+    ds = [encode_example(tok, r["text"], r["label"]) for r in rows]  # a list works as a torch Dataset
+    total_steps = math.ceil(len(ds) / batch_size) * math.ceil(epochs)
+    args = TrainingArguments(output_dir=str(Path(out_dir) / "_trainer"), num_train_epochs=epochs,
+                             learning_rate=lr, per_device_train_batch_size=batch_size,
+                             warmup_steps=max(1, total_steps // 10), weight_decay=0.01, logging_steps=log_steps,
+                             save_strategy="no", report_to=[], seed=seed, use_cpu=True,
+                             disable_tqdm=True)
+    trainer = Trainer(model=model, args=args, train_dataset=ds, data_collator=PadCollator(tok.pad_token_id))
+    trainer.train()
+    model.eval()
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(out_dir)
+    tok.save_pretrained(out_dir)
+    history = [h for h in trainer.state.log_history if "loss" in h]
+    (Path(out_dir) / "train_log.json").write_text(json.dumps(history, indent=1))
+    return model, tok, history
+
+
+def load_classifier(model_dir: Path = MODEL_DIR):
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    if not (Path(model_dir) / "config.json").exists():
+        raise FileNotFoundError(f"no trained model in {model_dir}; run `python -m app.cli train` first")
+    tok = AutoTokenizer.from_pretrained(model_dir)
+    model = AutoModelForCausalLM.from_pretrained(model_dir)
+    model.eval()
+    return model, tok
+
 
 
 # --- Milestone 4: Build an interface (CLI) to input new requests and show their classification.

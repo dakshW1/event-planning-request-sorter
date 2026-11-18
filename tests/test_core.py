@@ -70,9 +70,30 @@ def test_loss_is_only_on_the_label_token(base):
 
 
 # Milestone 3: Train the model on the example requests using the Hugging Face Trainer.
-@pytest.mark.skip(reason="remove this line when you start milestone 3")
-def test_milestone_3():
-    raise NotImplementedError("write the test for milestone 3")
+@pytest.fixture(scope="module")
+def trained(tmp_path_factory):
+    out = tmp_path_factory.mktemp("model")
+    rows = core.make_training_set(per_label=4)
+    model, tok, history = core.train(rows, TINY, out, epochs=3, lr=1e-2, batch_size=8, log_steps=1)
+    return model, tok, history, out
+
+
+def test_trainer_runs_saves_and_reloads(trained):
+    model, tok, history, out = trained
+    assert history and history[-1]["loss"] < history[0]["loss"]
+    assert json.loads((out / "train_log.json").read_text())
+    model2, tok2 = core.load_classifier(out)
+    assert core.label_token_ids(tok2) == core.label_token_ids(tok)
+
+
+def test_pad_collator_masks_padding(base):
+    _, tok = base
+    a = core.encode_example(tok, "short", "cancellation")
+    b = core.encode_example(tok, "a much longer request about the projector and the mic", "av_equipment")
+    batch = core.PadCollator(tok.pad_token_id)([a, b])
+    assert batch["input_ids"].shape == batch["labels"].shape
+    pad = batch["attention_mask"][0] == 0
+    assert (batch["labels"][0][pad] == -100).all()
 
 
 # Milestone 4: Build an interface (CLI) to input new requests and show their classification.
