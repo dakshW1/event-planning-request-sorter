@@ -1,5 +1,5 @@
 httpx
 pytest
-datasets
 transformers
+accelerate
 torch

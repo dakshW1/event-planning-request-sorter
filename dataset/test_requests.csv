@@ -1,0 +1,41 @@
+text,label
+"hey, is the rooftop terrace free on the 14th of feb for about 60 people?",venue_inquiry
+"We're looking at your lakeside hall for our company offsite. What's the max capacity?",venue_inquiry
+"Do you have any indoor spaces that can host a wedding of 200 in case it rains?",venue_inquiry
+"Can we come and see the banquet room before we decide?",venue_inquiry
+"Is parking included at the garden venue?",venue_inquiry
+"Could you send over the menu options for a vegetarian buffet?",catering_request
+"We need lunch boxes for 45 people at the workshop, a few of them gluten free.",catering_request
+"can the caterer do a live dosa counter at the reception?",catering_request
+"Please add high tea with snacks for the afternoon session.",catering_request
+"Is it possible to get a Jain menu for 30 of our guests?",catering_request
+"What would a full package cost for a 100 person product launch?",budget_quote
+"Our budget is around 3 lakh, what can you offer within that?",budget_quote
+"Can you send me an itemised quotation for the conference?",budget_quote
+"How much extra is it if we extend the event by two hours?",budget_quote
+"Do you offer any discount for booking three events together?",budget_quote
+"We need to push the anniversary dinner from Saturday to Sunday.",date_change
+"Can the seminar be moved one week later? Our speaker is unavailable.",date_change
+"is it ok if we start at 5 pm instead of 3 pm on the day?",date_change
+"Please reschedule our engagement ceremony to the 22nd.",date_change
+"The board meeting has to be brought forward to Monday morning.",date_change
+"Our headcount has gone up from 80 to 110, please update it.",guest_list
+"Attaching the final list of attendees with their meal preferences.",guest_list
+"Three of the invitees dropped out, so it's 47 now.",guest_list
+"Can you send RSVP reminders to the guests who haven't replied?",guest_list
+"We need name badges printed for everyone on the guest list.",guest_list
+"We'd love a rustic theme with fairy lights and wooden tables.",decor_theme
+"Can the stage backdrop be in our company colours, blue and white?",decor_theme
+"what flower arrangements do you suggest for a spring wedding?",decor_theme
+"Please make the hall look like a 1920s jazz club.",decor_theme
+"We want balloon arches at the entrance for the kids' party.",decor_theme
+"Will there be a projector and screen in the conference room?",av_equipment
+"We need two wireless mics and a podium for the speakers.",av_equipment
+"Can you arrange a DJ console and dance floor lighting?",av_equipment
+"is there reliable wifi for live streaming the talk?",av_equipment
+"Please set up a sound system for a live band of five.",av_equipment
+"Unfortunately we have to call off the retirement party.",cancellation
+"Please cancel our booking for the 9th and tell me about the refund.",cancellation
+"The client has withdrawn, so we won't need the venue anymore.",cancellation
+"what is your cancellation policy? we may have to drop the event.",cancellation
+"We're cancelling the workshop due to low registrations.",cancellation

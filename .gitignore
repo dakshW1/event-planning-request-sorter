@@ -10,3 +10,7 @@ __pycache__/
 # Local data
 data/
 *.db
+
+# trained model (about 500 MB): rebuild with `python -m app.cli train`
+models/
+classified_requests.jsonl
