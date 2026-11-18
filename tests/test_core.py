@@ -38,9 +38,35 @@ def test_csv_round_trip_rejects_unknown_labels(tmp_path):
 
 
 # Milestone 2: Configure GPT-2 with an extended tokenizer and model for custom tokens.
-@pytest.mark.skip(reason="remove this line when you start milestone 2")
-def test_milestone_2():
-    raise NotImplementedError("write the test for milestone 2")
+@pytest.fixture(scope="module")
+def base():
+    return core.load_base(TINY)
+
+
+def test_each_type_is_one_new_token(base):
+    model, tok = base
+    ids = core.label_token_ids(tok)
+    for label, i in ids.items():
+        assert tok.tokenize(core.label_token(label)) == [core.label_token(label)]  # not split up
+    assert model.get_input_embeddings().weight.shape[0] == len(tok)  # embeddings resized
+    assert tok.pad_token == "<|pad|>"
+
+
+def test_label_tokens_start_from_their_own_words(base):
+    model, tok = base
+    emb = model.get_input_embeddings().weight
+    ids = core.label_token_ids(tok)
+    venue = emb[tok(" venue inquiry")["input_ids"]].mean(dim=0)
+    assert (emb[ids["venue_inquiry"]] - venue).abs().max() < 1e-6
+    assert (emb[ids["venue_inquiry"]] - emb[ids["cancellation"]]).abs().max() > 0  # distinct from the start
+
+
+def test_loss_is_only_on_the_label_token(base):
+    _, tok = base
+    ex = core.encode_example(tok, "Is the hall free on Friday?", "venue_inquiry")
+    supervised = [t for t in ex["labels"] if t != -100]
+    assert supervised == [core.label_token_ids(tok)["venue_inquiry"], tok.eos_token_id]
+    assert ex["input_ids"][-2:] == supervised and len(ex["input_ids"]) == len(ex["labels"])
 
 
 # Milestone 3: Train the model on the example requests using the Hugging Face Trainer.

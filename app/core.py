@@ -158,9 +158,57 @@ def load_csv(path: Path) -> list[dict]:
 
 
 # --- Milestone 2: Configure GPT-2 with an extended tokenizer and model for custom tokens.
-# Hint: Extend the GPT-2 tokenizer and configure the model for custom tokens, as shown in the drill for special tags.
-def milestone_2():  # TODO(milestone 2)
-    raise NotImplementedError("TODO(milestone 2)")
+
+def label_token(label: str) -> str:
+    return f"<|{label}|>"
+
+
+def prompt_for(text: str) -> str:
+    return f"Request: {text.strip()}\nType:"
+
+
+def load_base(base_model: str = "gpt2"):
+    """GPT-2 + tokenizer, extended with one special token per request type and a pad token."""
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    tok = AutoTokenizer.from_pretrained(base_model)
+    tok.add_special_tokens({"pad_token": "<|pad|>",
+                            "additional_special_tokens": [label_token(lb) for lb in LABELS]})
+    model = AutoModelForCausalLM.from_pretrained(base_model)
+    model.resize_token_embeddings(len(tok))
+    model.config.pad_token_id = tok.pad_token_id
+    init_label_embeddings(model, tok)
+    return model, tok
+
+
+def init_label_embeddings(model, tok) -> None:
+    """Start each new label token at the average embedding of its own words (<|venue_inquiry|> starts at
+    mean(' venue', ' inquiry')). New tokens otherwise all start at the same vector, and since AdamW moves a
+    weight by about the learning rate per step, a few hundred steps cannot pull 8 identical vectors apart:
+    the model then gives every request the same type. GPT-2 ties input and output embeddings, so this also
+    sets the output side."""
+    import torch
+
+    emb = model.get_input_embeddings().weight
+    with torch.no_grad():
+        for label in LABELS:
+            word_ids = tok(" " + label.replace("_", " "))["input_ids"]
+            emb[tok.convert_tokens_to_ids(label_token(label))] = emb[word_ids].mean(dim=0)
+
+
+def label_token_ids(tok) -> dict[str, int]:
+    ids = {lb: tok.convert_tokens_to_ids(label_token(lb)) for lb in LABELS}
+    assert len(set(ids.values())) == len(LABELS) and tok.unk_token_id not in ids.values()
+    return ids
+
+
+def encode_example(tok, text: str, label: str, max_length: int = 64) -> dict:
+    """input = prompt + label token + eos; labels = -100 everywhere except the label token and eos,
+    so the loss teaches only *which type to write*, not how to reproduce the request."""
+    prompt_ids = tok(prompt_for(text))["input_ids"][: max_length - 2]
+    target = [tok.convert_tokens_to_ids(label_token(label)), tok.eos_token_id]
+    return {"input_ids": prompt_ids + target, "attention_mask": [1] * (len(prompt_ids) + 2),
+            "labels": [-100] * len(prompt_ids) + target}
 
 
 # --- Milestone 3: Train the model on the example requests using the Hugging Face Trainer.
